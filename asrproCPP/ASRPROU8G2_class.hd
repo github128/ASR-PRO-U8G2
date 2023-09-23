@@ -1,0 +1,277 @@
+
+#define ST7735_CS_PIN 2
+#define ST7735_CS_GPIO_PIN gpio_pin_2
+#define ST7735_DC_PIN 3
+#define ST7735_DC_GPIO_PIN gpio_pin_3
+#define ST7735_RST_PIN 1
+#define ST7735_RST_GPIO_PIN gpio_pin_1
+// #define ST7735_SCK_PIN 5
+// #define ST7735_MOSI_PIN 6
+#define ST7735_SCK_PIN 6
+#define ST7735_MOSI_PIN 5
+
+//#define ST7735_SCK_GPIO_PIN gpio_pin_5
+//#define ST7735_MOSI_GPIO_PIN gpio_pin_6
+
+/* 宏定义 --------------------------------------------------------------------*/
+
+#define MOSI  ST7735_MOSI_PIN 
+#define SCK ST7735_SCK_PIN 
+#define DC ST7735_DC_PIN
+#define CS ST7735_CS_PIN
+
+
+#include "asr.h"
+extern "C"{ void * __dso_handle = 0 ;}
+#include "setup.h"
+#include "myLib/luxiaoban.h"
+#include "HardwareSerial.h"
+#include "../U8G2/u8g2.h"
+
+void hardware_init();
+void emo_class();
+void weather_class();
+
+//u8g2_t u8g2;
+
+
+/////my init 
+  void ssd1306_spi_init()
+  {
+  pinMode(CS,output);
+	pinMode(DC,output);
+	//pinMode(ST7735_RST_PIN,output);
+	pinMode(SCK,output);
+	pinMode(MOSI,output);
+  }
+  
+uint8_t u8x8_avr_gpio_and_delay(u8x8_t *u8x8, uint8_t msg, uint8_t arg_int, void *arg_ptr)
+  {
+	// Re-use library for delays
+
+	switch(msg)
+	{
+	  //ms
+	  	case U8X8_MSG_DELAY_MILLI:
+        delay(1);
+      break;
+      
+      //10 us
+      case U8X8_MSG_DELAY_10MICRO:
+        delay10us();
+      break;
+      
+      //1 ns
+	   case U8X8_MSG_DELAY_NANO:
+        delay1us();
+      break;
+      
+    case U8X8_MSG_DELAY_100NANO:
+      delay1us();
+      break;
+      
+		case U8X8_MSG_GPIO_AND_DELAY_INIT:  // called once during init phase of u8g2/u8x8
+        ssd1306_spi_init();
+			break;              // can be used to setup pins
+		case U8X8_MSG_GPIO_SPI_CLOCK:        // Clock pin: Output level in arg_int
+			if(arg_int)
+				digitalWrite(SCK,1);
+			else
+				digitalWrite(SCK,0);
+			break;
+		case U8X8_MSG_GPIO_SPI_DATA:        // MOSI pin: Output level in arg_int
+			if(arg_int)
+				digitalWrite(MOSI,1);
+			else
+				digitalWrite(MOSI,0);
+			break;
+		case U8X8_MSG_GPIO_CS:        // CS (chip select) pin: Output level in arg_int
+			if(arg_int)
+				digitalWrite(CS,1);
+			else
+				digitalWrite(CS,0);
+			break;
+		case U8X8_MSG_GPIO_DC:        // DC (data/cmd, A0, register select) pin: Output level in arg_int
+      if(arg_int)
+				digitalWrite(DC,1);
+			else
+				digitalWrite(DC,0);
+			break;
+		
+		case U8X8_MSG_GPIO_RESET:     // Reset pin: Output level in arg_int
+
+		default:
+		  break;
+
+	}
+	return 1;
+}
+
+
+void u8g2Init(u8g2_t *u8g2)
+{
+
+  u8g2_Setup_ssd1306_128x64_noname_f(u8g2, U8G2_R0, u8x8_byte_4wire_sw_spi, u8x8_avr_gpio_and_delay);
+	u8g2_InitDisplay(u8g2);
+	u8g2_SetPowerSave(u8g2, 0);
+	u8g2_ClearBuffer(u8g2);
+} 
+
+class u8g2_class
+{
+  public:
+  u8g2_t u8g2;
+  void u8g2_init()
+  {
+    u8g2_Setup_ssd1306_128x64_noname_f(&u8g2, U8G2_R0, u8x8_byte_4wire_sw_spi, u8x8_avr_gpio_and_delay);
+  	u8g2_InitDisplay(&u8g2);
+  	u8g2_SetPowerSave(&u8g2, 0);
+  	u8g2_ClearBuffer(&u8g2);
+  }
+  void sendBuffer(void) { u8g2_SendBuffer(&u8g2); }
+  void clearBuffer(void) { u8g2_ClearBuffer(&u8g2); }    
+
+  u8g2_uint_t drawGlyph(u8g2_uint_t x, u8g2_uint_t y, uint16_t encoding) { return u8g2_DrawGlyph(&u8g2, x, y, encoding); }    
+  u8g2_uint_t drawGlyphX2(u8g2_uint_t x, u8g2_uint_t y, uint16_t encoding) { return u8g2_DrawGlyphX2(&u8g2, x, y, encoding); }    
+
+  void setColorIndex(uint8_t color_index) { u8g2_SetDrawColor(&u8g2, color_index); }
+  void setFont(const uint8_t  *font) {u8g2_SetFont(&u8g2, font); }
+  void setFontMode(uint8_t  is_transparent) {u8g2_SetFontMode(&u8g2, is_transparent); }
+  
+      void setBitmapMode(uint8_t is_transparent) 
+      { u8g2_SetBitmapMode(&u8g2, is_transparent); }
+    void drawBitmap(u8g2_uint_t x, u8g2_uint_t y, u8g2_uint_t cnt, u8g2_uint_t h, const uint8_t *bitmap)
+      { u8g2_DrawBitmap(&u8g2, x, y, cnt, h, bitmap); }
+    void drawXBM(u8g2_uint_t x, u8g2_uint_t y, u8g2_uint_t w, u8g2_uint_t h, const uint8_t *bitmap)
+      { u8g2_DrawXBM(&u8g2, x, y, w, h, bitmap); }
+    void drawXBMP(u8g2_uint_t x, u8g2_uint_t y, u8g2_uint_t w, u8g2_uint_t h, const uint8_t *bitmap)
+      { u8g2_DrawXBMP(&u8g2, x, y, w, h, bitmap); }
+  
+  
+};
+
+
+
+//创建线程
+void hardware_init(){
+  xTaskCreate(emo_class,"emo",256,NULL,4,NULL);
+  vTaskDelete(NULL);
+}
+
+uint32_t snid;
+
+extern "C" uint8_t myfont1[]; 
+
+u8g2_class u8g2c;
+
+
+void emo_class()
+{
+  int draw_color = 1;
+  u8g2c.setFont(myfont1);
+  u8g2c.setColorIndex(draw_color);
+  while(1)
+    { int k = 0;
+      for(int i = 0;i<72;i++)
+      {
+        
+        
+        u8g2c.clearBuffer();
+        u8g2c.drawGlyph(34,60,65+k%71);
+        u8g2c.sendBuffer();
+        k = k+1;
+        delay(100);
+      }
+  }
+   vTaskDelete(NULL);
+}
+
+void weather_class(void)
+{
+//天气
+  int draw_color = 1;
+  u8g2c.setColorIndex(draw_color);
+  u8g2c.setFont(u8g2_font_open_iconic_weather_6x_t);
+  while(true)
+    { int k = 0;
+  
+      for(int i = 0 ;i<5;i ++)
+      {
+       
+          u8g2c.clearBuffer();
+          u8g2c.drawGlyph(30,60,65+k%5);
+          u8g2c.sendBuffer();
+          k = k+1;
+          delay(100);
+          
+       // Serial.print(k);
+        k = k+1;
+        
+      }
+    }
+}
+
+
+
+//{ID:250,keyword:"命令词",ASR:"最大音量",ASRTO:"音量调整到最大"}
+//{speak:小美-娇美女声,vol:20,speed:10}
+//{playid:10001,voice:鹿唤醒我}
+//{playid:10002,voice:我退}
+void ASR_CODE()
+{
+  //emo_tst(&u8g2);
+  //{ID:500,keyword:"唤醒词",ASR:"小鹿同学",ASRTO:"我在呢"}
+  //{ID:501,keyword:"唤醒词",ASR:"小鹿小鹿",ASRTO:"AI"}
+  if(snid == 503){
+    luxiaoban_digital_write(0,0);
+  }
+  //{ID:505,keyword:"命令词",ASR:"请开灯",ASRTO:"灯已打开，亮度为最亮"}
+  if(snid == 505){
+    luxiaoban_digital_write(0,0);
+  }
+  //{ID:506,keyword:"命令词",ASR:"关灯",ASRTO:"灯已关闭"}
+  if(snid == 506){
+    luxiaoban_digital_write(0,1);
+  }
+
+}
+
+
+
+
+void setup()
+{
+  Serial.begin((9600));
+  
+//u8g2 初始化
+//	u8g2Init(&u8g2);
+  u8g2c.u8g2_init();
+
+
+		
+	xTaskCreate(hardware_init,"hardware_init",256,NULL,100,NULL);
+
+	
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/** edittype="asr_procode" */

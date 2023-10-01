@@ -97,7 +97,16 @@ class u8g2_class
   void clearBuffer(void) { u8g2_ClearBuffer(&u8g2); }    
 
   u8g2_uint_t drawGlyph(u8g2_uint_t x, u8g2_uint_t y, uint16_t encoding) { return u8g2_DrawGlyph(&u8g2, x, y, encoding); }    
-  u8g2_uint_t drawGlyphX2(u8g2_uint_t x, u8g2_uint_t y, uint16_t encoding) { return u8g2_DrawGlyphX2(&u8g2, x, y, encoding); }    
+  u8g2_uint_t drawGlyphX2(u8g2_uint_t x, u8g2_uint_t y, uint16_t encoding) { return u8g2_DrawGlyphX2(&u8g2, x, y, encoding); }
+
+  u8g2_uint_t drawStr(u8g2_uint_t x, u8g2_uint_t y, const char *s) { return u8g2_DrawStr(&u8g2, x, y, s); }
+  u8g2_uint_t drawStrX2(u8g2_uint_t x, u8g2_uint_t y, const char *s) { return u8g2_DrawStrX2(&u8g2, x, y, s); }
+    
+	void drawCircle(u8g2_uint_t x0, u8g2_uint_t y0, u8g2_uint_t rad, uint8_t opt = U8G2_DRAW_ALL) { u8g2_DrawCircle(&u8g2, x0, y0, rad, opt); }
+    void drawDisc(u8g2_uint_t x0, u8g2_uint_t y0, u8g2_uint_t rad, uint8_t opt = U8G2_DRAW_ALL) { u8g2_DrawDisc(&u8g2, x0, y0, rad, opt); }     
+    void drawEllipse(u8g2_uint_t x0, u8g2_uint_t y0, u8g2_uint_t rx, u8g2_uint_t ry, uint8_t opt = U8G2_DRAW_ALL) { u8g2_DrawEllipse(&u8g2, x0, y0, rx, ry, opt); }
+    void drawFilledEllipse(u8g2_uint_t x0, u8g2_uint_t y0, u8g2_uint_t rx, u8g2_uint_t ry, uint8_t opt = U8G2_DRAW_ALL) { u8g2_DrawFilledEllipse(&u8g2, x0, y0, rx, ry, opt); }    
+
 
   void setColorIndex(uint8_t color_index) { u8g2_SetDrawColor(&u8g2, color_index); }
   void setFont(const uint8_t  *font) {u8g2_SetFont(&u8g2, font); }

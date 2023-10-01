@@ -1,0 +1,606 @@
+
+#define ST7735_CS_PIN 2
+#define ST7735_CS_GPIO_PIN gpio_pin_2
+#define ST7735_DC_PIN 3
+#define ST7735_DC_GPIO_PIN gpio_pin_3
+#define ST7735_RST_PIN 1
+#define ST7735_RST_GPIO_PIN gpio_pin_1
+#define ST7735_SCK_PIN 5
+#define ST7735_MOSI_PIN 6
+// #define ST7735_SCK_PIN 6
+// #define ST7735_MOSI_PIN 5
+
+//#define ST7735_SCK_GPIO_PIN gpio_pin_5
+//#define ST7735_MOSI_GPIO_PIN gpio_pin_6
+
+/* 宏定义 --------------------------------------------------------------------*/
+
+#define MOSI  ST7735_MOSI_PIN 
+#define SCK ST7735_SCK_PIN 
+#define DC ST7735_DC_PIN
+#define CS ST7735_CS_PIN
+
+
+#include "asr.h"
+extern "C"{ void * __dso_handle = 0 ;}
+#include "setup.h"
+#include "myLib/luxiaoban.h"
+#include "HardwareSerial.h"
+#include "../U8G2/u8g2ASR.h"
+
+    
+int ndelay_interupt = 0;
+bool stop_sign = 0;
+
+u8g2_class u8g2c;
+
+void hardware_init();
+void emo_class();
+void weather_class();
+void draw_string(const char *s);
+void PlayWeatherAndDate();
+void process(); //主处理函数
+bool ndelay(int wait);
+void drawImage();
+void Show_Time();
+void Show_weather(char *cmd);
+
+
+QueueHandle_t message1=NULL;
+QueueHandle_t message2=NULL;
+uint32_t rec_1 = 0;
+uint32_t rec_2 = 0;
+uint32_t var = 0;
+
+unsigned char COMPUTER_CONTROL = 0; //电脑接管
+int CUR_X=0;
+int CUR_Y = 12;//set curlsor
+
+int draw_color = 1;
+int i = 0;
+int data_k = 0;
+
+
+uint32_t snid;
+
+extern "C" uint8_t myfont1[]; 
+
+
+    
+char cmd[20];
+int cmd_k = 0; //cmd count
+int m_cmd = 0;
+
+
+char buff[1024];
+
+
+void Show_Time()
+{
+    char sbuf[10];
+    sprintf(sbuf,"%d:%02d\0",cmd[2],cmd[3]);
+    Serial.print(sbuf);
+    
+    u8g2c.setColorIndex(draw_color);
+    u8g2c.setFont(u8g2_font_tenfatguys_tn);
+    u8g2c.clearBuffer();
+    u8g2c.drawStrX2(20,40,sbuf);
+    if(ndelay(100))
+      return ;
+    u8g2c.sendBuffer();
+}
+
+/*-------------------------------OLED显示---------*/
+void Oled()
+{
+  while(1)
+  {
+
+    if(COMPUTER_CONTROL == 0){
+      emo_class();
+      Show_Time();
+      weather_class();
+      
+    }
+    
+    if(xQueueReceive(message1,&rec_1,0)){
+      
+      ndelay_interupt = 0;
+      stop_sign = 0;
+      
+      if(rec_1 == 'e' )
+      {
+        Serial.println("MSG emo");
+        emo_class();
+      }
+      
+      else if(rec_1 == 's' )
+      {
+        Serial.println("MSG string");
+        draw_string(cmd); 
+      }
+      else if(rec_1 == 'w' )
+      {
+        Serial.println("MSG weatherData");
+        PlayWeatherAndDate();
+      }
+      else if(rec_1 == 'd')
+      {
+        Serial.println("msg display");
+        drawImage();
+      }
+      else if(rec_1 == 'T')
+      {
+        Show_Time();
+      }
+
+    }//queuemessage end 
+
+    
+    // delay(1);
+    
+  }//while end 
+    vTaskDelete(NULL);
+}
+
+/*------------------------------串口信息-msg_process---------*/
+void msg_Process(char * cmd){
+  
+   if(cmd[1] == 'I')  //send imag data
+    {
+      Serial.print("recv I");
+      i = 1024;
+    }
+    else if(cmd[1] == 'D')  //display imag data
+    {
+      Serial.print("recv D");
+      m_cmd = 'd';
+      ndelay_interupt = 1;
+      var = xQueueSend(message1,&m_cmd,0);
+      
+    }
+    else if(cmd[1] == '5')  //show str
+    {
+      Serial.print("recv 5");
+      
+      cmd[cmd_k-2] =0;
+      
+      m_cmd = 's';
+      ndelay_interupt = 1;
+      
+      var = xQueueSend(message1,&m_cmd,0);
+    }
+    else if(cmd[1] == 'W') //play weather
+    {
+      Serial.print("recv 4");
+      m_cmd = 'w';
+      ndelay_interupt = 1;
+      var = xQueueSend(message1,&m_cmd,0);
+      //PlayWeatherAndDate();
+    }
+    else if(cmd[1] =='E')  //play emo
+    {
+      Serial.print("recv 3");
+      m_cmd = 'e';
+      ndelay_interupt =1;
+      var = xQueueSend(message1,&m_cmd,0);
+      //emo_class();
+    }
+    else if(cmd[1] == 'T') //show Time 
+    {
+      Serial.print("recv T");
+      m_cmd = 'T';
+      ndelay_interupt =1;
+      var = xQueueSend(message1,&m_cmd,0);
+      
+    }
+    else 
+    {
+      Serial.println("no cmd");
+    }
+
+  //command select
+    if(strcmp(cmd,"weather")==0)  //4
+    {
+       Serial.println("play weather");
+        m_cmd = 'w';
+        ndelay_interupt = 1;
+        var = xQueueSend(message1,&m_cmd,0);
+        //PlayWeatherAndDate();
+    }
+    else if(strcmp(cmd,"emo") == 0)  //3
+    {
+      Serial.println("play emo");
+        m_cmd = 'e';
+        ndelay_interupt = 1;
+        var = xQueueSend(message1,&m_cmd,0);
+      //emo_class();
+    }
+                      //command end
+}
+
+
+/*---------------------语音识别----------ASR---------*/
+  //{speak:小美-娇美女声,vol:6,speed:8,platform:haohaodada}
+  //{playid:10001,voice:天问五幺唤醒我。}
+  //{playid:10002,voice:记得叫醒我哦}
+  //{ID:0,keyword:"唤醒词",ASR:"天问五幺",ASRTO:"哎 我在"}
+
+int shutdown = 0;
+void ASR_CODE()
+{
+  //emo_tst(&u8g2);
+  //{ID:500,keyword:"唤醒词",ASR:"小鹿同学",ASRTO:"哎 我在呢"}
+  //{ID:501,keyword:"唤醒词",ASR:"小鹿小鹿",ASRTO:"哎"}
+  //{ID:506,keyword:"命令词",ASR:"关灯",ASRTO:"好的"}
+  if(snid == 503){
+
+
+  }
+  //{ID:505,keyword:"命令词",ASR:"开灯",ASRTO:"好的"}
+  else if(snid == 505){
+    //luxiaoban_digital_write(0,0);
+    Serial.println("开灯");
+    digitalWrite(4,1);
+    
+  }
+  if(snid == 506){
+    Serial.println("关灯");
+    digitalWrite(4,0);
+    
+    //luxiaoban_digital_write(0,1);
+  }
+  //{ID:1,keyword:"命令词",ASR:"开机",ASRTO:"好的"}
+  else if(snid == 1){
+    Serial.println("开机");
+    //luxiaoban_digital_write(0,1);
+  }
+  
+  //{ID:10,keyword:"命令词",ASR:"关闭计算机",ASRTO:"好的，确定要关闭吗"}
+  //{ID:11,keyword:"命令词",ASR:"关机",ASRTO:"好的"}
+  //{ID:2,keyword:"命令词",ASR:"确定",ASRTO:"好的，关闭计算机"}
+  else if(snid == 10){
+  delay(200);
+  enter_wakeup(5000);
+  delay(200);
+  shutdown = 1;
+  }
+  else if(snid == 11)
+  {
+    if(shutdown == 1) 
+    {
+      Serial.write("shutdown");
+      shutdown = 0;
+    }
+    else{
+      shutdown = 0;
+      
+    }
+  }
+
+  else if(snid == 2){
+    Serial.println("关机");
+  //luxiaoban_digital_write(0,1);
+  }
+  //{ID:3,keyword:"命令词",ASR:"播放音乐",ASRTO:"好的"}
+  else if(snid == 3){
+    Serial.println("播放音乐");
+  }
+  //{ID:4,keyword:"命令词",ASR:"天气",ASRTO:"好的"}
+  else if(snid == 4){
+    Serial.println("weather");
+    //luxiaoban_digital_write(0,1);
+  }
+  //{ID:5,keyword:"命令词",ASR:"时间",ASRTO:"好的"}
+  else if(snid == 5){
+    Serial.println("时间");
+    //luxiaoban_digital_write(0,1);
+  }
+  
+  
+
+  
+
+}
+
+
+
+    
+
+char schar;
+void process()  //serial process 
+{
+  while(1)
+  {
+        
+        while(Serial.available()> 0 )
+        {
+          COMPUTER_CONTROL = 1;
+          
+          schar = Serial.read();
+         
+          //Serial.println(schar);  //important? 
+          
+          
+          if(i != 0) {  //recive data
+            buff[data_k] = schar;
+            data_k = data_k + 1;
+            i = i -1;
+            cmd_k = 0;
+            
+            Serial.print("i = ");
+            Serial.print(i);
+            
+          }
+            
+          else{
+            
+            cmd[cmd_k] = schar;
+            cmd_k = cmd_k +1;
+            if(cmd[cmd_k-1] == '\n')
+            {
+              cmd[cmd_k-1] = 0;
+              Serial.println(cmd);  //IMPORTANT?
+              //draw_string(cmd);
+              
+                //接收协议 M开头  操作码OP 附加信息AD M结尾
+                //OP = 0 命令 1 数据 
+                //AD OP =1 数据长度
+                if(cmd[0]== 'M' & cmd[cmd_k-2]=='M' )
+                {
+                  Serial.println("in xiyi");
+                  Serial.println(cmd[1]);
+                  
+                  msg_Process(cmd);
+      
+                     
+  
+                      
+              
+            }  // end  cmd[0]== 'M'  
+            cmd_k = 0;
+            } //end  '\n'
+          }  //end if i !=0
+        } //end  Serial.Avalible
+        delay(2);  // important error no recv
+  }//end while(1)
+  vTaskDelete(NULL);
+}
+
+
+//创建线程
+void hardware_init(){
+  message1=xQueueCreate(5,4);
+  message2=xQueueCreate(5,4);
+  
+  xTaskCreate(process,"process",256,NULL,4,NULL);
+  xTaskCreate(Oled,"oled",256,NULL,4,NULL);
+
+  vTaskDelete(NULL);
+}
+
+
+
+
+void emo_class()
+{
+  ndelay_interupt = 0;
+  int draw_color = 1;
+  u8g2c.setFont(myfont1);
+  u8g2c.setColorIndex(draw_color);
+  for(int m = 0;m<1;m++)
+    { int k = 0;
+      for(int i = 0;i<72;i++)
+      {
+        
+        
+        u8g2c.clearBuffer();
+        // u8g2c.drawGlyph(34,60,65+k%71);
+        u8g2c.drawGlyph(34,60,65+31+k%6);
+        if(ndelay(100))
+           return ;
+         
+        u8g2c.sendBuffer();
+        k = k+1;
+        
+      }
+  }
+  // vTaskDelete(NULL);
+}
+
+void weather_class(void)
+{
+//天气
+  ndelay_interupt = 0;
+  int draw_color = 1;
+  u8g2c.setColorIndex(draw_color);
+  u8g2c.setFont(u8g2_font_open_iconic_weather_6x_t);
+  for(int m = 0;m<5;m++)
+    { int k = 0;
+  
+      for(int i = 0 ;i<5;i ++)
+      {
+       
+          u8g2c.clearBuffer();
+          u8g2c.drawGlyph(30,60,65+k%5);
+          if(ndelay(100))
+            return ;
+          u8g2c.sendBuffer();
+          k = k+1;
+          
+          
+       // Serial.print(k);
+        k = k+1;
+        
+      }
+    }
+}
+
+//enum _weather{cloude ,cld_su, moon,rain,start,sun};
+
+void Show_weather(char *cmd)
+{
+  
+  int wt = cmd[2];
+  
+  ndelay_interupt = 0;
+  int draw_color = 1;
+  u8g2c.setColorIndex(draw_color);
+  u8g2c.setFont(u8g2_font_open_iconic_weather_6x_t);
+       
+  u8g2c.clearBuffer();
+  u8g2c.drawGlyph(30,60,64+int(wt));
+  if(ndelay(100))
+    return ;
+  u8g2c.sendBuffer();
+          
+          
+}
+
+
+
+
+
+
+
+
+
+
+  
+void setup()
+{
+
+//Serial 0
+  setPinFun(13,SECOND_FUNCTION);
+  setPinFun(14,SECOND_FUNCTION);
+  Serial.begin((9600));
+  
+  
+  Serial.println("setup");
+  
+//u8g2 初始化
+//	u8g2Init(&u8g2);
+  u8g2c.u8g2_init();
+
+
+pinMode(20,output); //pc4
+pinMode(4,output);  //pa4
+setPinFun(4,FIRST_FUNCTION);
+		
+	xTaskCreate(hardware_init,"hardware_init",256,NULL,100,NULL);
+
+	
+
+}
+
+
+
+void PlayWeatherAndDate()
+{
+  unsigned char r = 0;
+  
+  
+  for(int i = 0;i<100;i ++)
+  {
+    r = r % 40;
+  u8g2c.setColorIndex(draw_color);
+
+  u8g2c.clearBuffer();
+  u8g2c.setFont(u8g2_font_8x13B_tf);
+  u8g2c.drawStr(40,60, "12月20日");
+
+  u8g2c.setFont(u8g2_font_open_iconic_weather_4x_t);
+  u8g2c.drawGlyph(65,40,65);
+
+  u8g2c.drawCircle(30,30,r );
+
+  u8g2c.sendBuffer();
+  
+  if(ndelay(10))
+    return ;
+  r = r+1;
+  }
+  
+
+
+}
+
+//draw string
+void draw_string(const char *s) {
+  // assign default color value
+  int draw_color = 1;
+  u8g2c.setColorIndex(draw_color);
+  u8g2c.setFont(u8g2_font_8x13B_tf);
+    
+    u8g2c.clearBuffer();
+    u8g2c.drawStr(0,12, s);
+    u8g2c.sendBuffer();
+    
+  
+  if(ndelay(1000))
+  return ;
+  
+}
+
+
+void interrupt(){
+  ndelay_interupt = 1;
+}
+
+
+bool ndelay(int wait)
+{
+  int w = wait;
+  while(w >0)
+  {
+    if(ndelay_interupt == 1  )
+    {
+      //ndelay_interupt = 0;
+      stop_sign = 1;
+      Serial.println("ndelay interrup");
+      
+      return 1;
+    }
+    delay(1);
+    w= w-1;
+  }
+  return 0;
+}
+
+void drawImage()
+{
+  
+  u8g2c.drawBitmap(0, 0, 16,64, buff); //right 128/8 X64
+  u8g2c.sendBuffer();
+  ndelay(1000);
+  
+}
+
+
+
+
+
+
+
+
+
+
+    //if(xQueueReceive(message2,&rec_2,0)){
+    //  Serial.println(rec_2);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/** edittype="asr_procode" */
